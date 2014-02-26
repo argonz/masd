@@ -74,6 +74,17 @@
   (ImageIO/read (new File pth)))
 
 
+;; getting image from path
+;; but around - we will use something different 
+(defn img->rgb-coll [img]
+  (doall (for [i0 (range (.getWidth img))]
+           (for [i1 (range (.getHeight img))]
+             (let [c (new Color (.getRGB img i0 i1))]
+               ;; so that getting the resulting out .
+               [(.getRed c) (.getGreen c) (.getBlue c)])))))
+(defn pth->rgbs [pth]
+  (to-array-2d (img->rgb-coll (path->img pth))))
+
   
      
 
@@ -106,6 +117,11 @@
 (defn vrect-ltc-init [ltc siz col]
   (let [rbc (vec+vec ltc siz)]
     (vrect-corner-init ltc rbc col)))
+
+;; creating dots - as it's stuff 
+(defn vobj-dot-init [pos col]
+  (vrect-ltc-init pos [1 1] col))
+
  
 ;; scaling stuff - we would need it too :) 
 (defn vobj-field->scale-vector [v field scl]
@@ -136,14 +152,23 @@
         true (println "something wrong - this shouldn't happen ..")))
 
 ;; this is all around we will have some 
-(defn vobjs->img [vs wh] 
-  (let [img (img-init wh)
-        g (img->graphics img)]
-    (do (doseq [v vs] (grph-vobj->draw! g v))
-        img)))
-(defn vobjs->show [vs wh]
-  (let [i (vobjs->img vs wh)]    
-    (img->show-in-panel! i)))
+(defn vobjs->max-rbc-dim [vs]
+  (let [rbcs (map :rbc vs)]
+    [(apply max (map first rbcs))
+     (apply max (map second rbcs))]))        
+(defn vobjs->img 
+  ([vs wh] (let [img (img-init wh)
+                 g (img->graphics img)]
+             (do (doseq [v vs] (grph-vobj->draw! g v))
+                 img)))
+  ([vs] (vobjs->img vs (vobjs->max-rbc-dim vs))))
+(defn vobjs->show 
+  ([vs wh] (let [i (vobjs->img vs wh)]    
+             (img->show-in-panel! i)))
+  ([vs] (let [i (vobjs->img vs)]
+          (img->show-in-panel! i))))
+              
+
 (defn vobjs->save-image [vs wh pth]
   (img->save-file (vobjs->img vs wh) pth))
 
@@ -157,16 +182,23 @@
 
 ;; creating image from RGB - that's pretty cool :) 
 ;; creating an image from an rgb :)
+(defn rgb-point->scaled-vrect [pos scl rgb]  
+  (vrect-ltc-init (vec*scl pos scl) [scl scl] rgb))
 (defn rgbs->vobjs 
   ([rgbs] (rgbs->vobjs 1))
-  ([rgbs scl] (let [[d0 d1] (array-2d->dims rgbs)]
-                (for [i0 (range d0)]
-                  (for [i1 (range d1)]
-                    (vrect-ltc-init [i0 i1] [scl scl]))))))
+  ([rgbs scl] (let [[d0 d1] (arr2d->dims rgbs)]
+                (reduce into
+                        (vec
+                         (for [i0 (range d0)]
+                           (vec
+                            (for [i1 (range d1)]
+                              (rgb-point->scaled-vrect [i0 i1] 
+                                                       scl 
+                                                       (aget rgbs i0 i1))))))))))
 ;; (for further manipulation .. 
 (defn rgbs->img 
   ([rgbs] (rgbs->img rgbs 1))
-  ([rgbs scl] (let [[d0 d1] (array-2d->dims rgbs)
+  ([rgbs scl] (let [[d0 d1] (arr2d->dims rgbs)
                     img (img-init (vec*scl [d0 d1] scl))
                     g (img->graphics img)]
 
